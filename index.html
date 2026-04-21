@@ -181,9 +181,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13
 <div class="main">
   <div class="section-label" style="margin-top:.5rem">Filtros</div>
   <div class="filters">
-    <select class="filter-select" id="f-mes" onchange="applyFilters()"><option value="">Todos os meses</option></select>
-    <select class="filter-select" id="f-ano" onchange="applyFilters()"><option value="">Todos os anos</option></select>
+    <div style="display:flex;align-items:center;gap:6px">
+      <label style="font-size:11px;color:var(--muted)">De</label>
+      <input type="date" id="f-start" class="filter-select" onchange="applyFilters()">
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <label style="font-size:11px;color:var(--muted)">Até</label>
+      <input type="date" id="f-end" class="filter-select" onchange="applyFilters()">
+    </div>
     <select class="filter-select" id="f-conta" onchange="applyFilters()"><option value="">Todas as contas</option></select>
+    <button class="filter-select" onclick="clearDates()" style="cursor:pointer;color:var(--muted)">Limpar datas</button>
+    <div style="display:flex;gap:4px;flex-wrap:wrap" id="quick-filters"></div>
   </div>
 
   <div class="section-label">Visão geral</div>
@@ -276,33 +284,89 @@ function showToast(msg,type='ok'){const t=document.getElementById('toast');t.tex
 
 function parseDate(s){
   if(!s) return null;
-  // DD/MM/YY or DD/MM/YYYY
-  const p = s.split('/');
-  if(p.length===3){
-    let y = parseInt(p[2]);
-    if(y<100) y+=2000;
-    return new Date(y, parseInt(p[1])-1, parseInt(p[0]));
+  if(s.includes('/')){
+    const p=s.split('/');
+    let y=parseInt(p[2]); if(y<100) y+=2000;
+    return new Date(y,parseInt(p[1])-1,parseInt(p[0]));
+  }
+  if(s.includes('-')&&s.length>=8){
+    return new Date(s+'T00:00:00');
   }
   return null;
 }
 
+function parseDateStr(s){
+  if(!s) return null;
+  const p=s.split('/');
+  if(p.length===3){let y=parseInt(p[2]);if(y<100)y+=2000;return new Date(y,parseInt(p[1])-1,parseInt(p[0]));}
+  return null;
+}
+
+function toInputDate(d){ // Date → YYYY-MM-DD
+  if(!d) return '';
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
 function populateFilters(rows){
-  const MES_ORDER=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
-  const meses=[...new Set(rows.map(r=>r.mes).filter(Boolean))].sort((a,b)=>MES_ORDER.indexOf(a)-MES_ORDER.indexOf(b));
-  const anos=[...new Set(rows.map(r=>r.ano).filter(Boolean))].sort();
   const contas=[...new Set(rows.map(r=>r.conta).filter(Boolean))].sort();
   const sel=(id,vals)=>{const el=document.getElementById(id);const cur=el.value;el.innerHTML='<option value="">'+el.options[0].text+'</option>';vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;if(v==cur)o.selected=true;el.appendChild(o);});};
-  sel('f-mes',meses); sel('f-ano',anos); sel('f-conta',contas);
+  sel('f-conta',contas);
+
+  // Set min/max dates from data
+  const dates = rows.map(r=>parseDate(r.data)).filter(Boolean).sort((a,b)=>a-b);
+  if(dates.length){
+    const minD=toInputDate(dates[0]);
+    const maxD=toInputDate(dates[dates.length-1]);
+    const s=document.getElementById('f-start');
+    const e=document.getElementById('f-end');
+    s.min=minD; s.max=maxD;
+    e.min=minD; e.max=maxD;
+    if(!s.value) s.value=minD;
+    if(!e.value) e.value=maxD;
+  }
+
+  // Quick filter buttons
+  const now = new Date();
+  const qf = document.getElementById('quick-filters');
+  const QUICKS = [
+    {label:'Este mês', fn:()=>{ const d=new Date(); return {s:toInputDate(new Date(d.getFullYear(),d.getMonth(),1)), e:toInputDate(new Date(d.getFullYear(),d.getMonth()+1,0))}; }},
+    {label:'Mês ant.', fn:()=>{ const d=new Date(); return {s:toInputDate(new Date(d.getFullYear(),d.getMonth()-1,1)), e:toInputDate(new Date(d.getFullYear(),d.getMonth(),0))}; }},
+    {label:'Tudo', fn:()=>{ const dates=allRows.map(r=>parseDate(r.data)).filter(Boolean).sort((a,b)=>a-b); return {s:toInputDate(dates[0]),e:toInputDate(dates[dates.length-1])}; }},
+  ];
+  qf.innerHTML = QUICKS.map((q,i)=>`<button class="filter-select" style="cursor:pointer;color:var(--muted2)" onclick="quickFilter(${i})">${q.label}</button>`).join('');
+  window._quicks = QUICKS;
+}
+
+function quickFilter(i){
+  const r = window._quicks[i].fn();
+  document.getElementById('f-start').value = r.s;
+  document.getElementById('f-end').value = r.e;
+  applyFilters();
+}
+
+function clearDates(){
+  const dates = allRows.map(r=>parseDate(r.data)).filter(Boolean).sort((a,b)=>a-b);
+  if(dates.length){
+    document.getElementById('f-start').value = toInputDate(dates[0]);
+    document.getElementById('f-end').value = toInputDate(dates[dates.length-1]);
+  }
+  applyFilters();
 }
 
 function applyFilters(){
-  const mes=document.getElementById('f-mes').value;
-  const ano=document.getElementById('f-ano').value;
-  const conta=document.getElementById('f-conta').value;
-  let rows=allRows;
-  if(mes) rows=rows.filter(r=>r.mes===mes);
-  if(ano) rows=rows.filter(r=>String(r.ano)===String(ano));
-  if(conta) rows=rows.filter(r=>r.conta===conta);
+  const startVal = document.getElementById('f-start').value;
+  const endVal   = document.getElementById('f-end').value;
+  const conta    = document.getElementById('f-conta').value;
+  let rows = allRows;
+  if(startVal){
+    const s = new Date(startVal+'T00:00:00');
+    rows = rows.filter(r=>{ const d=parseDate(r.data); return d&&d>=s; });
+  }
+  if(endVal){
+    const e = new Date(endVal+'T23:59:59');
+    rows = rows.filter(r=>{ const d=parseDate(r.data); return d&&d<=e; });
+  }
+  if(conta) rows = rows.filter(r=>r.conta===conta);
   renderDashboard(rows);
 }
 
