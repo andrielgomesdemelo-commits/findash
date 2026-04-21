@@ -436,7 +436,7 @@ function renderDashboard(rows){
   // === KPIs ===
   const K=(label,val,sub,cls)=>`<div class="kpi ${cls}"><div class="kpi-label">${label}</div><div class="kpi-value">${fmtK(val)}</div><div class="kpi-sub">${sub}</div></div>`;
   document.getElementById('kpi-grid').innerHTML=
-    K('Faturamento bruto',totalRec,'Receita Operacional','c-blue')+
+    K('Receita bruta',totalRec,'Receita Operacional','c-blue')+
     K('Receita líquida',recLiq,'(-) impostos '+fmtK(impostos),'')+
     K('Despesas operacionais',-totalDesp,'5 categorias','c-red')+
     K('Lucro operacional',lucroOp,'Margem '+margem.toFixed(1)+'%',lucroOp>=0?'c-green':'c-red')+
@@ -494,7 +494,7 @@ function renderDashboard(rows){
   const tt=(lbl,val,cls)=>`<tr class="total"><td>${lbl}</td><td class="val" style="color:${cls}">${val}</td></tr>`;
   const ts=(lbl)=>`<tr class="section-sep"><td colspan="2">${lbl}</td></tr>`;
   document.getElementById('dre-table').innerHTML=
-    tr('Receita Operacional (faturamento)',fmt(totalRec),'var(--blue)',false)+
+    tr('Receita bruta',fmt(totalRec),'var(--blue)',false)+
     tr('(-) Impostos',fmt(-impostos),'var(--red)',true)+
     tt('= Receita líquida',fmt(recLiq),'var(--green)')+
     tr('(-) Mercadoria',fmt(-despCat.Mercadoria),'var(--red)',true)+
